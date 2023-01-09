@@ -8,6 +8,12 @@ import touch
 import usocket
 import network
 
+#--------settings--------
+SSID='dundundun'
+PASSWORD='30963096'
+SERVER='192.168.91.16'
+PORT=3096
+
 bl=Pin(15,Pin.OUT)
 bl.on()
 #-------------images----------------
@@ -26,6 +32,7 @@ lvgl_png = load_image('lvgl')
 mpy_png = load_image('mpy')
 done_png = load_image('done')
 logo_png = load_image('logo')
+error_png = load_image('error')
 
 def test_Animation(TargetObject, delay):
     PropertyAnimation_0 = lv.anim_t()
@@ -66,7 +73,7 @@ obj.set_src(logo_png)
 obj.align(lv.ALIGN.CENTER, 10, -40)
 
 wifi_label = lv.label(lv.scr_act())
-wifi_label.set_text('WIFI connecting...')
+wifi_label.set_text('RULER connecting...')
 wifi_label.align(lv.ALIGN.CENTER, 10, 80)
 
 def do_connect():
@@ -75,26 +82,40 @@ def do_connect():
     if not sta_if.isconnected():
         print('connecting to network...')
         sta_if.active(True)
-        sta_if.connect('dundundun', '30963096')
+        sta_if.connect(SSID, PASSWORD)
         print('network status2:', sta_if.status())
         while not sta_if.isconnected():
             pass
     print('network status3:', sta_if.status())
     
 do_connect()
-wifi_label.set_text("WIFI connected!")
+
 spinner.delete()
+
+
+
+try:
+    s = usocket.socket(usocket.AF_INET,usocket.SOCK_STREAM)  
+    addr = usocket.getaddrinfo(SERVER, PORT)[0][-1]
+    s.connect(addr)
+    s.send("RULER connected!")
+except:
+    obj = lv.img(lv.scr_act())
+    obj.set_src(error_png)
+    obj.align(lv.ALIGN.CENTER, 10, 33)
+    obj.set_style_opa(lv.OPA._0,0)
+    test_Animation(obj, 0)
+    wifi_label.set_text("SERVER NOT FOUND")
+    while 1:
+        pass
+    
+
 obj = lv.img(lv.scr_act())
 obj.set_src(done_png)
 obj.align(lv.ALIGN.CENTER, 10, 33)
 obj.set_style_opa(lv.OPA._0,0)
-test_Animation(obj, 0)
-
-
-s = usocket.socket(usocket.AF_INET,usocket.SOCK_STREAM)  
-addr = usocket.getaddrinfo('192.168.91.16', 3096)[0][-1]
-s.connect(addr)
-s.send("RULER connected!")
+test_Animation(obj, 0)    
+wifi_label.set_text("RULER connected!")
 
 time.sleep(2)
 lv.scr_act().clean()
