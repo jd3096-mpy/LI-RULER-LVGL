@@ -3,19 +3,64 @@ import ili9XXX
 import lvgl as lv
 import espidf as esp
 import time
-from machine import Pin
+from machine import Pin,RTC,Timer
 import touch
 import usocket
-import network
+import network,ntptime
 
+#--------------NTPTIME------------
+ntptime.NTP_DELTA = 3155644800
+ntptime.host = 'ntp1.aliyun.com'
 #--------settings--------
 SSID='dundundun'
 PASSWORD='30963096'
 SERVER='192.168.91.16'
 PORT=3096
-
+screen=False
+bs=Pin(0,Pin.IN,Pin.PULL_UP)
+rtc=RTC()
 bl=Pin(15,Pin.OUT)
 bl.on()
+
+def ntp_get():
+    for i in range(6):
+        try:            
+            ntptime.settime()      
+            print("ntp time(BeiJing): ",rtc.datetime())
+            return True
+        except:
+            print("Can not get time!")
+        time.sleep_ms(500)
+        
+def showtime(t):
+    print('time fresh')
+    rdt=rtc.datetime()
+    ww=rdt[3]
+    if ww==0:
+        weekday='MON'
+    elif ww==1:
+        weekday='TUE'
+    elif ww==2:
+        weekday='WED'
+    elif ww==3:
+        weekday='THU'
+    elif ww==4:
+        weekday='FRI'
+    elif ww==5:
+        weekday='SAT'
+    elif ww==6:
+        weekday='SUN'
+    dd=str(rdt[0])+'-'+str(rdt[1])+'-'+str(rdt[2])
+    hh=str(rdt[4])
+    mm=str(rdt[5])
+    if len(hh)==1:
+        hh='0'+hh
+    if len(mm)==1:
+        mm='0'+mm
+    Scr_clock_Label1.set_text(dd)
+    Scr_clock_Label2.set_text(hh+':'+mm+' '+weekday)
+
+    
 #-------------images----------------
 def load_image(filename):
     filename='/ico/'+filename+'.png'
@@ -33,6 +78,12 @@ mpy_png = load_image('mpy')
 done_png = load_image('done')
 logo_png = load_image('logo')
 error_png = load_image('error')
+clockbg_png = load_image('clockbg')
+
+import fs_driver
+fs_drv = lv.fs_drv_t()
+fs_driver.fs_register(fs_drv, 'S')
+font_mc = lv.font_load("S:ui_font_mc.bin")
 
 def test_Animation(TargetObject, delay):
     PropertyAnimation_0 = lv.anim_t()
@@ -59,6 +110,7 @@ disp = ili9XXX.st7789(width=300, height=240,miso=41, mosi=14, clk=21, cs=47, dc=
 tp=touch.CST816S()
 lv.init()
 
+#-------------screen connect------------
 scr = lv.scr_act()
 scr.set_style_bg_color(lv.color_hex(0xd0d0d0), lv.PART.MAIN)
 
@@ -93,7 +145,6 @@ do_connect()
 spinner.delete()
 
 
-
 try:
     s = usocket.socket(usocket.AF_INET,usocket.SOCK_STREAM)  
     addr = usocket.getaddrinfo(SERVER, PORT)[0][-1]
@@ -117,11 +168,13 @@ obj.set_style_opa(lv.OPA._0,0)
 test_Animation(obj, 0)    
 wifi_label.set_text("RULER connected!")
 
-time.sleep(2)
+ntp_get()
 lv.scr_act().clean()
 
-scr = lv.scr_act()
-scr.set_style_bg_color(lv.color_hex(0xf0f0f0), lv.PART.MAIN)
+#---------------screen button------------------
+Scr_btn = lv.obj()
+
+Scr_btn.set_style_bg_color(lv.color_hex(0xf0f0f0), lv.PART.MAIN)
 
 style = lv.style_t()
 style.init()
@@ -141,7 +194,7 @@ btn_select=''
 class BTN():
     def __init__(self, x,y,text,png):
         self.text=text
-        self.btn=lv.btn(lv.scr_act())                        
+        self.btn=lv.btn(Scr_btn)                        
         self.btn.add_style(style, 0)
         self.btn.add_style(style_pr, lv.STATE.PRESSED)
         self.btn.set_size(120, 100)
@@ -170,6 +223,49 @@ btn2=BTN(75,-60,'GITHUB',github_png)
 btn3=BTN(-55,60,'LVGL',lvgl_png)
 btn4=BTN(75,60,'MPY',mpy_png)
 
+#--------------------screen clock-----------------
+Scr_clock = lv.obj()
+Scr_clock.set_style_bg_img_src(clockbg_png, lv.PART.MAIN | lv.STATE.DEFAULT )
+
+Scr_clock_Label1 = lv.label(Scr_clock)
+Scr_clock_Label1.set_text("2023-12-23")
+Scr_clock_Label1.set_width(lv.SIZE_CONTENT)	# 1
+Scr_clock_Label1.set_height(lv.SIZE_CONTENT)   # 1
+Scr_clock_Label1.set_x(10)
+Scr_clock_Label1.set_y(-41)
+Scr_clock_Label1.set_align( lv.ALIGN.CENTER)
+Scr_clock_Label1.set_style_text_color( lv.color_hex(0x84DCE5), lv.PART.MAIN | lv.STATE.DEFAULT )
+Scr_clock_Label1.set_style_text_opa(255, lv.PART.MAIN| lv.STATE.DEFAULT )
+Scr_clock_Label1.set_style_text_font( font_mc, lv.PART.MAIN | lv.STATE.DEFAULT )
+
+Scr_clock_Label2 = lv.label(Scr_clock)
+Scr_clock_Label2.set_text("09:35 Tue")
+Scr_clock_Label2.set_width(lv.SIZE_CONTENT)	# 1
+Scr_clock_Label2.set_height(lv.SIZE_CONTENT)   # 1
+Scr_clock_Label2.set_x(10)
+Scr_clock_Label2.set_y(20)
+Scr_clock_Label2.set_align( lv.ALIGN.CENTER)
+Scr_clock_Label2.set_style_text_color( lv.color_hex(0xD6D4EA), lv.PART.MAIN | lv.STATE.DEFAULT )
+Scr_clock_Label2.set_style_text_opa(255, lv.PART.MAIN| lv.STATE.DEFAULT )
+Scr_clock_Label2.set_style_text_font( font_mc, lv.PART.MAIN | lv.STATE.DEFAULT )
+
+lv.scr_load(Scr_clock)
+
+def change_screen(t):
+    print('switch screen')
+    global screen
+    while not bs.value():
+        pass
+    if screen:
+        lv.scr_load(Scr_clock)
+    else:
+        lv.scr_load(Scr_btn)
+    screen=not screen
+    
+bs.irq(handler=change_screen, trigger=Pin.IRQ_RISING)
+tim=Timer(1)
+tim.init(period=5000, callback=showtime)
+
 while 1:
     if btn_select!='':
         print(btn_select)
@@ -183,5 +279,6 @@ while 1:
         elif btn_select=='MPY':
             s.send("MPY")
         btn_select=''
+
 
 
